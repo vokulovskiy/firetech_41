@@ -1,0 +1,13 @@
+# Базовый образ Jupyter Notebook
+FROM jupyter/minimal-notebook:latest
+
+# Установка pip и других зависимостей, если нужно
+RUN pip install --upgrade pip
+
+# Копирование и установка библиотек из requirements.txt
+COPY requirements.notebook.txt /tmp/requirements.notebook.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.notebook.txt
+
+# Проверка установленных библиотек
+RUN pip freeze
+

@@ -1,0 +1,245 @@
+networks:
+  jupyterhub-network:
+    driver: bridge
+    name: jupyterhub-network  # Создание сети для JupyterHub
+  monitoring:
+    driver: bridge
+    name: monitoring  # Создание сети для мониторинга
+  loki:
+    driver: bridge
+    name: loki  # Создание сети для Loki (системы логирования)
+
+volumes:
+  prometheus_data: {}  # Том для хранения данных Prometheus
+  grafana-storage:  # Том для хранения данных Grafana
+  jupyterhub-data:  # Том для хранения данных JupyterHub
+  notebook_data:  # Том для хранения данных пользовательских ноутбуков
+  pg-data:  # Том для хранения данных PostgreSQL
+
+services:
+
+  jupyterhub:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyterhub  # Сборка образа JupyterHub из указанного Dockerfile
+    restart: unless-stopped  # Автоматический перезапуск контейнера, если он не остановлен вручную
+    container_name: jupyterhub  # Имя контейнера
+    networks:
+      - jupyterhub-network  # Подключение к сети JupyterHub
+      - monitoring  # Подключение к сети мониторинга
+    volumes:
+      # Конфигурационный файл JupyterHub
+      - "./jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro"
+      # Подключение сокета Docker для взаимодействия с Docker-демоном из контейнера
+      - "/var/run/docker.sock:/var/run/docker.sock:rw"
+      # Том для хранения базы данных и секретов JupyterHub
+      - "jupyterhub-data:/data"
+    ports:
+      - "8000:8000"  # Порт для доступа к JupyterHub
+    environment:
+      # Имя администратора JupyterHub
+      JUPYTERHUB_ADMIN: admin
+      # Имя сети, к которой будут подключаться контейнеры
+      DOCKER_NETWORK_NAME: jupyterhub-network  
+      # Образ, который будет использоваться для создания пользовательских ноутбуков
+      DOCKER_NOTEBOOK_IMAGE: my-custom-jupyter-notebook:latest
+      # Директория для ноутбуков внутри пользовательского образа
+      DOCKER_NOTEBOOK_DIR: /home/jovyan/work
+
+  postgres:
+    image: postgres:17.0-alpine3.20  # Использование образа PostgreSQL
+    container_name: postgres  # Имя контейнера
+    ports:
+      - "5433:5432"  # Порт для доступа к PostgreSQL
+    environment:
+      POSTGRES_PASSWORD: Postgres  # Пароль для пользователя PostgreSQL
+      POSTGRES_DB: postgres  # Имя базы данных по умолчанию
+      PGDATA: /var/lib/postgresql/data/pgdata  # Директория для данных PostgreSQL
+    volumes:
+      - pg-data:/var/lib/postgresql/data  # Том для хранения данных PostgreSQL
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    networks:
+      - jupyterhub-network  # Подключение к сети JupyterHub
+      - monitoring  # Подключение к сети мониторинга
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]  # Проверка здоровья PostgreSQL
+      interval: 5s  # Интервал проверки
+      timeout: 10s  # Тайм-аут проверки
+      retries: 3  # Количество попыток
+
+  # PostgreSQL Exporter - сбор метрик PostgreSQL
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter  # Использование образа для экспорта метрик PostgreSQL
+    container_name: postgres_exporter  # Имя контейнера
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:Postgres@postgres:5432/postgres?sslmode=disable"  # Источник данных для подключения к PostgreSQL
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: 1  # Автоматическое обнаружение всех баз данных для сбора метрик
+    ports:
+      - "9187:9187"  # Порт для доступа к экспортеру
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+    depends_on:
+      - postgres  # Зависимость от контейнера PostgreSQL
+
+  node-exporter:
+    image: prom/node-exporter:latest  # Использование образа для сбора метрик узла
+    container_name: node-exporter  # Имя контейнера
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    volumes:
+      - /proc:/host/proc:ro  # Подключение директории /proc для сбора метрик
+      - /sys:/host/sys:ro  # Подключение директории /sys для сбора метрик
+      - /:/rootfs:ro  # Подключение корневой файловой системы для сбора метрик
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'  # Исключение определенных точек монтирования
+    ports:
+      - 9100:9100  # Порт для доступа к экспортеру
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1  # Использование образа cAdvisor для мониторинга контейнеров
+    container_name: cadvisor  # Имя контейнера
+    volumes:
+      - /:/rootfs:ro  # Подключение корневой файловой системы
+      - /var/run:/var/run:rw  # Подключение директории /var/run
+      - /sys:/sys:ro  # Подключение директории /sys
+      - /var/lib/docker:/var/lib/docker:ro  # Подключение директории Docker
+      - /dev/disk/:/dev/disk:ro  # Подключение директории /dev/disk
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    ports:
+      - "8080:8080"  # Порт для доступа к cAdvisor
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+
+  prometheus:
+    image: prom/prometheus:latest  # Использование образа Prometheus
+    container_name: prometheus  # Имя контейнера
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml  # Подключение конфигурационного файла Prometheus
+      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml  # Подключение файла с правилами оповещений
+      - prometheus_data:/prometheus  # Том для хранения данных Prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'  # Указание конфигурационного файла
+      - '--storage.tsdb.path=/prometheus'  # Указание пути для хранения данных
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'  # Включение управления жизненным циклом через API
+    ports:
+      - 9090:9090  # Порт для доступа к Prometheus
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+
+  sqlagent:
+    image: dbhi/sql-agent  # Использование образа SQL Agent
+    container_name: sqlagent  # Имя контейнера
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+    ports: 
+      - 5000:5000  # Порт для доступа к SQL Agent
+
+  prometheussql:
+    image: dbhi/prometheus-sql  # Использование образа Prometheus SQL
+    container_name: prometheussql  # Имя контейнера
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+    links:
+      - sqlagent:sqlagent  # Связь с контейнером SQL Agent
+    ports:
+      - 8090:8080  # Порт для доступа к Prometheus SQL
+    volumes:
+      - ./prometheussql.queries.yml:/queries.yml  # Подключение файла с запросами
+
+  alertmanager:
+    image: prom/alertmanager:latest  # Использование образа Alertmanager
+    container_name: alertmanager  # Имя контейнера
+    ports:
+      - "9093:9093"  # Порт для доступа к Alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml  # Подключение конфигурационного файла Alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'  # Указание конфигурационного файла
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+
+  netdata:
+    image: netdata/netdata  # Использование образа Netdata
+    container_name: netdata  # Имя контейнера
+    ports:
+      - "19999:19999"  # Порт веб-интерфейса Netdata
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    cap_add:
+      - SYS_PTRACE  # Добавление возможностей для мониторинга
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined  # Отключение AppArmor
+    environment:
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud  # URL для подключения к облаку Netdata
+      - DISABLE_TELEMETRY=1  # Отключение телеметрии
+      - NETDATA_BIND=0.0.0.0:19999  # Привязка к порту
+      - DISABLE_WEB_ACCESS_LOGS=1  # Отключение логов доступа
+      - NETDATA_DISABLE_CLOUD=1  # Отключение облака
+    volumes:
+      - /:/host/root:ro,rslave  # Подключение корневой файловой системы
+      - /etc/passwd:/host/etc/passwd:ro  # Подключение файла /etc/passwd
+      - /etc/group:/host/etc/group:ro  # Подключение файла /etc/group
+      - /etc/localtime:/etc/localtime:ro  # Подключение временной зоны
+      - /proc:/host/proc:ro  # Подключение директории /proc
+      - /sys:/host/sys:ro  # Подключение директории /sys
+      - /etc/os-release:/host/etc/os-release:ro  # Подключение информации о системе
+      - /var/log:/host/var/log:ro  # Подключение логов
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Подключение сокета Docker
+      - /run/dbus:/run/dbus:ro  # Подключение D-Bus
+    networks:
+      - monitoring  # Подключение к сети мониторинга
+
+  loki:
+    image: grafana/loki:latest  # Использование образа Loki
+    container_name: loki  # Имя контейнера
+    ports:
+      - "3100:3100"  # Порт для доступа к Loki
+#    volumes:
+      # touch /mnt/common_volume/swarm/grafana/config/loki.yaml;
+      # mkdir -p /mnt/common_volume/grafana/loki-data;
+#      - ./loki.yaml:/etc/loki/local-config.yaml:ro
+#      - ./config:/loki
+    command: -config.file=/etc/loki/local-config.yaml  # Указание конфигурационного файла
+    networks:
+      - loki  # Подключение к сети Loki
+
+  promtail:
+    image: grafana/promtail:latest  # Использование образа Promtail
+    container_name: promtail  # Имя контейнера
+    volumes:
+      - ./promtail.yaml:/etc/promtail/promtail.yaml:ro
+      - /config:/var/promtail
+      - /var/log:/var/log:ro  # Подключение директории логов
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: 
+      - "--config.file=/etc/promtail/promtail.yaml"
+      - "--config.expand-env=true"
+    networks:
+      - loki  # Подключение к сети Loki
+
+  grafana:
+    container_name: grafana  # Имя контейнера
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Пароль администратора Grafana
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning  # Путь к конфигурации Grafana
+      - GF_AUTH_ANONYMOUS_ENABLED=true  # Разрешение анонимного доступа
+#      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin  # Роль анонимного пользователя
+      - GF_FEATURE_TOGGLES_ENABLE=alertingSimplifiedRouting,alertingQueryAndExpressionsStepMode  # Включение дополнительных функций
+    volumes:
+      - grafana-storage:/var/lib/grafana  # Том для хранения данных Grafana
+      - ./grafana.ini:/etc/grafana/grafana.ini  # Подключение конфигурационного файла Grafana
+    restart: unless-stopped  # Автоматический перезапуск контейнера
+    image: grafana/grafana:latest  # Использование образа Grafana
+    ports:
+      - "3000:3000"  # Порт для доступа к Grafana
+    networks:
+      - loki  # Подключение к сети Loki
+      - monitoring  # Подключение к сети мониторинга

@@ -1,0 +1,4 @@
+jupyterhub>=4.0.0
+dockerspawner>=13.0.0
+jupyterhub-nativeauthenticator>=1.2.0
+jupyterhub-idle-culler>=1.2.0

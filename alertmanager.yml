@@ -1,0 +1,18 @@
+global:
+  smtp_smarthost: 'smtp.mail.ru:465'
+  smtp_from: 'vlad_ok@mail.ru'
+  smtp_auth_username: 'vlad_ok@mail.ru'
+  smtp_auth_password: 'cy38nEaLktKyLnpn90WP'  
+  smtp_require_tls: false
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'email-notifications'
+
+receivers:
+- name: 'email-notifications'
+  email_configs:
+  - to: 'vasyapupkin441780@gmail.com'
