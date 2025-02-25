@@ -1,0 +1,15 @@
+tables_info:
+  query: |
+    SELECT C.relname as table_name, T.tableowner as table_owner, pg_total_relation_size (C.oid) as table_size 
+    FROM pg_class C join pg_tables T ON (T.tablename = C .relname) 
+    WHERE T.schemaname = 'public'
+  metrics:
+    - table_size_bytes:
+        usage: GAUGE
+        description: "Size of the table in bytes"
+    - table_name:
+        usage: LABEL
+        description: "Name of the table"
+    - table_owner:
+       usage: LABEL
+       description: "Owner of the table"

@@ -1,7 +1,8 @@
-##1. Установка ubuntu
-Настроить сеть -> тип подключения: сетевой мост
+## 1. Установка и настройка ubuntu server
+Я установил ubuntu-24.04.1-live-server-amd64.iso на Oracle VirtualBox    
+1. Настроить сеть -> тип подключения: сетевой мост
 ip a
-##2. Установка ssh
+2. Установка ssh
 sudo apt update && sudo apt upgrade
 sudo apt install openssh-server
 sudo systemctl enable --now ssh
@@ -20,7 +21,7 @@ chmod 0700 ~/.ssh
 touch ~/.ssh/authorized_keys
 chmod 0644 ~/.ssh/authorized_keys
 
-##3. Установка docker
+## 2. Установка docker
 1. Обновляем индексы пакетов apt
 sudo apt update
 

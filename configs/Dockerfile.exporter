@@ -1,0 +1,11 @@
+# Стадия сборки
+FROM python:3.9-alpine AS builder
+RUN apk add --no-cache docker-cli
+RUN pip install --no-cache-dir prometheus_client docker
+
+# Финальный образ
+FROM python:3.9-alpine
+COPY --from=builder /usr/local /usr/local
+COPY notebook_exporter.py /notebook_exporter.py
+EXPOSE 17666
+CMD ["python", "/notebook_exporter.py"]

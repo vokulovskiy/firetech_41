@@ -1,0 +1,21 @@
+services: 
+  jupyter-exporter:
+    build:
+      context: ./
+      dockerfile: Dockerfile.exporter
+    image: notebook-exporter.v1
+    container_name: notebook-exporter
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 17666:17666
+    networks:
+      - monitoring
+    
+networks:
+  monitoring:
+    name: monitoring
+    external: true
+
+#docker build -f Dockerfile.exporter -t notebook-exporter.v1 .
+#docker run -v /var/run/docker.sock:/var/run/docker.sock -p 17666:17666 --name jupyter-exporter --network monitoring -it -d notebook-exporter.v1

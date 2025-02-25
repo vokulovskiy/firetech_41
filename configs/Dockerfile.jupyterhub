@@ -1,6 +1,6 @@
 FROM quay.io/jupyterhub/jupyterhub:latest
 
-COPY requirements.jupyterhub.txt /tmp/requirements.jupyterhub.txt
+COPY /configs/requirements.jupyterhub.txt /tmp/requirements.jupyterhub.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.jupyterhub.txt
 
 CMD ["jupyterhub", "-f", "/srv/jupyterhub/jupyterhub_config.py"]

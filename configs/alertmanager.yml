@@ -2,7 +2,7 @@ global:
   smtp_smarthost: 'smtp.mail.ru:465'
   smtp_from: 'vlad_ok@mail.ru'
   smtp_auth_username: 'vlad_ok@mail.ru'
-  smtp_auth_password: 'cy38nEaLktKyLnpn90WP'  
+  smtp_auth_password: 'cy38nEaLktKyLnpn90WP1'  
   smtp_require_tls: false
 
 route:
@@ -15,4 +15,4 @@ route:
 receivers:
 - name: 'email-notifications'
   email_configs:
-  - to: 'vasyapupkin441780@gmail.com'
+  - to: 'vasyapupkin@gmail.com'

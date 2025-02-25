@@ -2,6 +2,7 @@
 FROM jupyter/minimal-notebook:latest
 
 # Установка pip и других зависимостей, если нужно
+RUN apk add --no-cache docker-cli
 RUN pip install --upgrade pip
 
 # Копирование и установка библиотек из requirements.txt

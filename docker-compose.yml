@@ -21,7 +21,7 @@ services:
   jupyterhub:
     build:
       context: .
-      dockerfile: Dockerfile.jupyterhub  # Сборка образа JupyterHub из указанного Dockerfile
+      dockerfile: ./configs/Dockerfile.jupyterhub  # Сборка образа JupyterHub из указанного Dockerfile
     restart: unless-stopped  # Автоматический перезапуск контейнера, если он не остановлен вручную
     container_name: jupyterhub  # Имя контейнера
     networks:
@@ -29,7 +29,7 @@ services:
       - monitoring  # Подключение к сети мониторинга
     volumes:
       # Конфигурационный файл JupyterHub
-      - "./jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro"
+      - "./configs/jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro"
       # Подключение сокета Docker для взаимодействия с Docker-демоном из контейнера
       - "/var/run/docker.sock:/var/run/docker.sock:rw"
       # Том для хранения базы данных и секретов JupyterHub
@@ -42,18 +42,20 @@ services:
       # Имя сети, к которой будут подключаться контейнеры
       DOCKER_NETWORK_NAME: jupyterhub-network  
       # Образ, который будет использоваться для создания пользовательских ноутбуков
-      DOCKER_NOTEBOOK_IMAGE: my-custom-jupyter-notebook:latest
+      DOCKER_NOTEBOOK_IMAGE: pattern_notebook:v1
       # Директория для ноутбуков внутри пользовательского образа
       DOCKER_NOTEBOOK_DIR: /home/jovyan/work
 
   postgres:
     image: postgres:17.0-alpine3.20  # Использование образа PostgreSQL
     container_name: postgres  # Имя контейнера
+    env_file: ./.env
     ports:
-      - "5433:5432"  # Порт для доступа к PostgreSQL
+      - "5433:${DB_PORT}"  # Порт для доступа к PostgreSQL
     environment:
-      POSTGRES_PASSWORD: Postgres  # Пароль для пользователя PostgreSQL
-      POSTGRES_DB: postgres  # Имя базы данных по умолчанию
+      POSTGRES_USER: ${POSTGRES_USER}  # Пароль для пользователя PostgreSQL
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Пароль для пользователя PostgreSQL
+      POSTGRES_DB: ${POSTGRES_DB}  # Имя базы данных по умолчанию
       PGDATA: /var/lib/postgresql/data/pgdata  # Директория для данных PostgreSQL
     volumes:
       - pg-data:/var/lib/postgresql/data  # Том для хранения данных PostgreSQL
@@ -62,18 +64,21 @@ services:
       - jupyterhub-network  # Подключение к сети JupyterHub
       - monitoring  # Подключение к сети мониторинга
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]  # Проверка здоровья PostgreSQL
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]  # Проверка здоровья PostgreSQL
       interval: 5s  # Интервал проверки
       timeout: 10s  # Тайм-аут проверки
       retries: 3  # Количество попыток
 
-  # PostgreSQL Exporter - сбор метрик PostgreSQL
   postgres_exporter:
-    image: prometheuscommunity/postgres-exporter  # Использование образа для экспорта метрик PostgreSQL
+    image: prometheuscommunity/postgres-exporter:v0.16.0  # Использование образа для экспорта метрик PostgreSQL
     container_name: postgres_exporter  # Имя контейнера
+    env_file: ./.env
+    volumes:
+      - ./configs/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:Postgres@postgres:5432/postgres?sslmode=disable"  # Источник данных для подключения к PostgreSQL
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}?sslmode=disable"
       PG_EXPORTER_AUTO_DISCOVER_DATABASES: 1  # Автоматическое обнаружение всех баз данных для сбора метрик
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
     ports:
       - "9187:9187"  # Порт для доступа к экспортеру
     networks:
@@ -82,7 +87,7 @@ services:
       - postgres  # Зависимость от контейнера PostgreSQL
 
   node-exporter:
-    image: prom/node-exporter:latest  # Использование образа для сбора метрик узла
+    image: prom/node-exporter:v1.8.2  # Использование образа для сбора метрик узла
     container_name: node-exporter  # Имя контейнера
     restart: unless-stopped  # Автоматический перезапуск контейнера
     volumes:
@@ -115,12 +120,12 @@ services:
       - monitoring  # Подключение к сети мониторинга
 
   prometheus:
-    image: prom/prometheus:latest  # Использование образа Prometheus
+    image: quay.io/prometheus/prometheus:v3.1.0  # Использование образа Prometheus
     container_name: prometheus  # Имя контейнера
     restart: unless-stopped  # Автоматический перезапуск контейнера
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml  # Подключение конфигурационного файла Prometheus
-      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml  # Подключение файла с правилами оповещений
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml  # Подключение конфигурационного файла Prometheus
+      - ./configs/alert.rules.yml:/etc/prometheus/alert.rules.yml  # Подключение файла с правилами оповещений
       - prometheus_data:/prometheus  # Том для хранения данных Prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'  # Указание конфигурационного файла
@@ -133,33 +138,13 @@ services:
     networks:
       - monitoring  # Подключение к сети мониторинга
 
-  sqlagent:
-    image: dbhi/sql-agent  # Использование образа SQL Agent
-    container_name: sqlagent  # Имя контейнера
-    networks:
-      - monitoring  # Подключение к сети мониторинга
-    ports: 
-      - 5000:5000  # Порт для доступа к SQL Agent
-
-  prometheussql:
-    image: dbhi/prometheus-sql  # Использование образа Prometheus SQL
-    container_name: prometheussql  # Имя контейнера
-    networks:
-      - monitoring  # Подключение к сети мониторинга
-    links:
-      - sqlagent:sqlagent  # Связь с контейнером SQL Agent
-    ports:
-      - 8090:8080  # Порт для доступа к Prometheus SQL
-    volumes:
-      - ./prometheussql.queries.yml:/queries.yml  # Подключение файла с запросами
-
   alertmanager:
     image: prom/alertmanager:latest  # Использование образа Alertmanager
     container_name: alertmanager  # Имя контейнера
     ports:
       - "9093:9093"  # Порт для доступа к Alertmanager
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml  # Подключение конфигурационного файла Alertmanager
+      - ./configs/alertmanager.yml:/etc/alertmanager/alertmanager.yml  # Подключение конфигурационного файла Alertmanager
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'  # Указание конфигурационного файла
     restart: unless-stopped  # Автоматический перезапуск контейнера
@@ -198,7 +183,7 @@ services:
       - monitoring  # Подключение к сети мониторинга
 
   loki:
-    image: grafana/loki:latest  # Использование образа Loki
+    image: grafana/loki:3.4.2  # Использование образа Loki
     container_name: loki  # Имя контейнера
     ports:
       - "3100:3100"  # Порт для доступа к Loki
@@ -215,7 +200,7 @@ services:
     image: grafana/promtail:latest  # Использование образа Promtail
     container_name: promtail  # Имя контейнера
     volumes:
-      - ./promtail.yaml:/etc/promtail/promtail.yaml:ro
+      - ./configs/promtail.yaml:/etc/promtail/promtail.yaml:ro
       - /config:/var/promtail
       - /var/log:/var/log:ro  # Подключение директории логов
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -226,18 +211,17 @@ services:
       - loki  # Подключение к сети Loki
 
   grafana:
+    image: grafana/grafana:11.5.1  # Использование образа Grafana
     container_name: grafana  # Имя контейнера
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin  # Пароль администратора Grafana
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning  # Путь к конфигурации Grafana
       - GF_AUTH_ANONYMOUS_ENABLED=true  # Разрешение анонимного доступа
-#      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin  # Роль анонимного пользователя
       - GF_FEATURE_TOGGLES_ENABLE=alertingSimplifiedRouting,alertingQueryAndExpressionsStepMode  # Включение дополнительных функций
     volumes:
       - grafana-storage:/var/lib/grafana  # Том для хранения данных Grafana
-      - ./grafana.ini:/etc/grafana/grafana.ini  # Подключение конфигурационного файла Grafana
+      - ./configs/grafana.ini:/etc/grafana/grafana.ini  # Подключение конфигурационного файла Grafana
     restart: unless-stopped  # Автоматический перезапуск контейнера
-    image: grafana/grafana:latest  # Использование образа Grafana
     ports:
       - "3000:3000"  # Порт для доступа к Grafana
     networks:
