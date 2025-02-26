@@ -9,16 +9,13 @@
   - [Ответы на вопросы](#ответы-на-вопросы)
 - [Задание №2](#задание-№2)
   - [1.Используемые инструменты для мониторинга, сбора метрик и визуализации.](#конфигурация-системы-мониторинга-на-базе-prometheus-grafana-loki)
-  - [2. Добавление сервисов в Docker Compose](#2-Добавление-сервисов-в-Docker-Compose)
-  - [3. Дашборды](#3-Дашборды)
-    - [3.1 Дашборд Активности пользователей и Размера тетрадок Jupyterhub.](#31-Дашборд-Активности-пользователей-и-Размера-тетрадок-Jupyterhub)
-    - [3.2 Дашборд размера таблиц в PostgreSQL.](#32-Дашборд-размера-таблиц-в-PostgreSQL)
-    - [3.4 Дашборд используемых ресурсов контейнерами](#34-Дашборд-используемых-ресурсов-контейнерами)
-  - [4. Алерты](#4-Алерты)
-    - [4.1 Алерт использования CPU на 80%](#41-Алерт-использования-CPU-на-80)
-    - [4.2 Алерт входа по SSH на сервер.](#42-Алерт-входа-по-SSH-на-сервер)
-  - [Итог](#Итог)
-
+  - [2. Добавление сервисов в Docker Compose](#2-добавление-сервисов-в-docker-compose)
+  - [3. Дашборды](#3-дашборды)
+  - [4. Алерты](#4-алерты)
+    - [4.1 Алерт использования CPU на 80%](#41-алерт-использования-cpu-на-80)
+    - [4.2 Алерт входа по SSH на сервер.](#42-алерт-входа-по-ssh-на-сервер)
+  - [Итог](#итог)
+2. Добавление сервисов в Docker Compose
 ***
 
 # Задание №1
@@ -51,6 +48,11 @@
 cd ~
 git clone https://github.com/vokulovskiy/firetech_41.git 
 cd firetech_41
+```
+Переименовать файлы и заполнить своими данными:  
+  .env.example -> .env   
+  configs/alertmanager.example.yml -> configs/alertmanager.yml
+```bash
 ## Запускаем приложения
 docker compose up --build -d
 ```
@@ -122,7 +124,7 @@ cd ..
   docker stats --no-stream
   ```
  ![](screens/Jupyter_stats.JPG) 
-8. [Как подключиться к тетрадке в JupyterHub через Visual Studio Code](docs\Connect_VSC.md) 
+8. [Как подключиться к тетрадке в JupyterHub через Visual Studio Code](docs/Connect_VSC.md) 
 
 ## Заключение
 В ходе выполнения домашнего задания мы научились разворачивать jupytehub c возможностью регистрации новых пользователей, а так же подключаться через Jupyterhub к базе данных Postgres и манипулировать данными.
@@ -198,7 +200,7 @@ cd ..
 - `Grafana` по адресу `http://localhost:3000`
 
 Чтобы войти в `Grafana` по умолчанию используется ЛОГИН `admin` ПАРОЛЬ `admin` после система предложит вам изменить пароль (если при сборке образа вы не задали другие учетные данные)
-![2025-02-24_11-56-12](https://github.com/user-attachments/assets/3ab2ec7e-14e9-44a8-a485-b30b0319de57)
+![](screens/grafana.png)
 
 
 Проверим работу всех exporter в `prometheus`.
@@ -207,158 +209,67 @@ cd ..
 
 Убедимся, что `State` у всех `exporter` имеет статус UP (значит все `exporter` передают наши метрики в `prometheus`)
 
-![2025-02-23_18-27-32](https://github.com/user-attachments/assets/8e433c92-d37c-484c-8c7a-1a70c54e23a6)
+![](screens/prometheus.JPG)
 
 Переходим в `http://localhost:9090/alerts` и проверяем добавился ли наш алерт 
-![2025-02-23_19-16-00](https://github.com/user-attachments/assets/f48c656f-2c6f-4d11-9bce-6cd5ff576261)
+![](screens/Prometheus_alert.JPG)   
 
 
-Добавим источник данных в `Grafana` заходим в раздел `Data sources` и добавляем  `prometheus` в графе `Connection` прописываем `host` и `port`
-![2025-02-23_18-13-37](https://github.com/user-attachments/assets/54177072-c343-412d-853e-1e9d31f0dc6d)
-наши контейнеры находятся в общей сети `jupyter-network` поэтому обращаемся по названию конрейнера и порту(если контейнеры находятся в разных сетях обращаться необходимо по IP либо localhost и внешнему порту который вы прокинули наружу).
+***
+## 3. Дашборды
 
-Добавим дашборд для проверки работоспособности:
+Добавим источник данных в `Grafana` заходим в раздел `Data sources` и добавляем  `prometheus` и `loki` в графе `Connection` прописываем `host` и `port`
+
+Наши контейнеры находятся в общей сети `monitoring` поэтому обращаемся по названию конрейнера и порту(если контейнеры находятся в разных сетях обращаться необходимо по IP либо localhost и внешнему порту который вы прокинули наружу).
 
 1. Выберем раздел `dashboards`
-2. Add visualization (Если хотеите импортировать какой то определенный дашборд шелкаем `Import a dashboard` и импортируем необходимы дашборд)
-![2025-02-24_12-10-38](https://github.com/user-attachments/assets/ca8e9add-ed83-4af2-b231-185a79ee395a)
+2. Готовые дашборды можно поискать на сервере https://grafana.com/grafana/dashboards/   
+  для PostgreSQL: 455, 9628   
+  для Node Exporter: 1860, 15172, 10242   
+  для Docker(cadvisor): 10619, 893, 13946
+***
 
-Визуализация метрики:
-
-1. Выбираем метрику.
-2. Выбираем `Legend` подпись для графиков
-3. Установим необходимую единицу измерения
-![2025-02-24_12-15-12](https://github.com/user-attachments/assets/2f38bb9d-f716-448d-8153-49341a42f01d)
-
-## 3. Дашборды
-### 3.1 Дашборд Активности пользователей и Размера тетрадок Jupyterhub.
-
+**Создадим  дашборд по нашему заданию:**   
 Метрики:
 - `jupyterhub_total_users` - количество зарегистрированых пользователей
 - `jupyterhub_active_users{period="24h"}` - количество активных пользователей за 24 часа
 - `jupyterhub_running_servers` - количество запушенных серверов
 - `sum(jupyterhub_request_duration_seconds_count)` - количество запросов
-- `jupyterhub_notebook_file_size_bytes` - кастомная метрика [exporter](notebook_metrics/jupyterhub_notebook_files_metrics.py) которая передает размеры тетрадок jupyterhub
-![2025-02-23_18-56-03](https://github.com/user-attachments/assets/81e2b3ae-ae0b-46a5-91f7-cdb752cb10c0)
+- `container_memory_usage_bytes{image="pattern_notebook:v1"}` - Использование памяти тетрадками пользователей
+- `container_fs_usage_bytes{image="pattern_notebook:v1"}` - Объем используемого дискового пространства тетрадками пользователей
+- `tables_info_table_size` - Размеры таблиц пользователей в PostgreSQL(была определена внутри **[queries.yaml](configs/queries.yaml)**) 
+![](screens/User_stat.JPG)
 
-### 3.2 Дашборд размера таблиц в PostgreSQL.
-
-Гистограмы отражают топ 10 самых больших таблиц и их пользователей в моем случае таблицы 4 поэтому показано только 4.
-
-На графике отражается динамика добавления данных в таблицы, когда и сколько килобайт данных добавлены в таблицу.
-
-Метрика:
-- `table_sizes_size_bytes` - была определена внутри **[queries.yaml](https://github.com/Zubaev/jupyterhub_docker_postgres/blob/main/postgres-exporter/queries.yaml)** 
-
-![2025-02-23_18-35-23](https://github.com/user-attachments/assets/816040f1-cc21-482e-b293-d107974da18e)
-
-### 3.4 Дашборд используемых ресурсов контейнерами 
-![2025-02-23_18-41-34](https://github.com/user-attachments/assets/73330863-d342-48e9-ad1f-38a83d863114)
-
+http://krg-utyak.tplinkdns.com:3000/public-dashboards/d9a3a8b0dc5945a7ba9573b347d3d929
+***
 ## 4. Алерты
 
 ### 4.1 Алерт использования CPU на 80%
+Настраивается в prometheus [alert.rules](configs/alert.rules.yml)   
+Проверим приходят ли оповещения. В ноутбуке даем команду `!while true; do echo “HOT HOT HOT CPU”; done`   
+![](screens/Alarm_CPU.JPG)
+Проверяем почту:   
+![](screens/Alarm_CPU_email.JPG)
 
-Проверим приходят ли оповещения, для проверки работоспособности я временно снизил парог чтобы при загрузке 30% приходил алерт, все работает!)
-![2025-02-23_19-18-26](https://github.com/user-attachments/assets/2ac0fd8d-b1ef-40bc-8785-a40e01720913)
-
+***
 ### 4.2 Алерт входа по SSH на сервер.
 
-1. установим необходимые зависимости
-```
-sudo apt-get install postfix mailutils -y
-```
-2. Настройка Postfix
-Создайте файл паролей:
-```
-sudo nano /etc/postfix/sasl_passwd
-```
-
-Перед настройкой Postfix необходимо иметь пароль приложения. Это делается в разделе безопасности вашей учетной записи почты.
-
-`'smtp.yandex.ru:587'` - Адрес SMTP-сервера и порт для отправки писем
-
-<img width="568" alt="Снимок экрана 2025-02-24 135449" src="https://github.com/user-attachments/assets/69fc55ed-a9be-4f90-bf06-bf948a371ab8" />
-
-
-Сохраните изменения, а затем измените разрешения файла, так чтобы его мог просматривать только пользователь root:
-```
-sudo chmod 600 /etc/postfix/sasl_passwd  
-```
-
-Откройте основной файл конфигурации Postfix:
-```
-sudo nano /etc/postfix/main.cf 
-```
-
-В файле main.cf найдите параметр relayhost и измените строку на:
-```bash
-relayhost = [smtp.yandex.ru]:587 #если вы используете yandex
-```
-
-Ниже этой строки добавьте следующее:
-```bash
-relayhost = [smtp.yandex.ru]:587
-
-smtp_use_tls = yes
-smtp_sasl_auth_enable = yes
-smtp_sasl_security_options =
-smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
-smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
-
-mynetworks = [::ffff:127.0.0.0]/104 [::1]/128 #эти строки неоходимо заменить
-mailbox_size_limit = 0 #эти строки неоходимо заменить
-recipient_delimiter = + #эти строки неоходимо заменить
-inet_interfaces = all #эти строки неоходимо заменить
-inet_protocols = ipv4 #эти строки неоходимо заменить
-```
-
-Далее нужно скомпилировать и хешировать содержимое файла sasl_password, который мы создали ранее, с помощью команды:
-```
-sudo postmap /etc/postfix/sasl_passwd
-```
-Перезапустите Postfix:
-
-```
-sudo systemctl restart postfix  
-```
-
-Включите Postfix для запуска при старте:
-
-```
-sudo systemctl enable postfix
-```
-
-3. Создание оповещения о входе по SSH
-
-Введите команду:
-```
-sudo nano /etc/profile
-```
-
-В конце файла добавьте следующее:
-
-```bash
-if [ -n "$SSH_CLIENT" ]; then
-    TEXT="$(date): ssh login to ${USER}@$(hostname -f)"
-    TEXT="$TEXT from $(echo $SSH_CLIENT | awk '{print $1}')"
-    echo "$TEXT" | mail -s "ssh login" magazubaev92@gmail.com -a "From:magazubaev92@yandex.ru"
-fi
-
-```
-`magazubaev92@gmail.com` - почта получателя
-`magazubaev92@yandex.ru` - почта отправителя
-
-Проверяем работоспособность
-![2025-02-24_14-13-08](https://github.com/user-attachments/assets/d8743948-12eb-4c5e-a92e-d7caa1ba4f7b)
+1. Создаем "Contact point" в Grafana, необходимо подключить alertmanager в качестве контакта.
+![setting_ssh_alert](screens/grafana_contact_point.JPG)
+Нажимаем "Test", проверяем, что письмо пришло.
+***
+2. Создаем "Alert rule":
+![setting_ssh_alert](screens/grafana_alert_rule.JPG)
+![email_aler_ssh](screens/Alarm_SSH.JPG)
 
 # Итог
 
-В рамках выполнения второго домашнего задания мы приобрели практические навыки в настройке комплексной системы мониторинга, основанной на следующих ключевых компонентах:
+В рамках выполнения второго домашнего задания мы приобрели практические навыки в настройке комплексной системы мониторинга и логирования, основанной на следующих ключевых компонентах:
 
-`Prometheus` : Изучили основы конфигурации `Prometheus` для сбора и хранения метрик различных сервисов. Настроили `scrape jobs` для сбора данных с разных источников.
+`Prometheus` : Изучили основы конфигурации `Prometheus` для сбора и хранения метрик различных сервисов. Настроили `scrape jobs` для сбора данных с разных источников. Создали аларм на почту при использования CPU в контейнере > 80%.
 
-`Grafana` : Научились создавать дашборды для визуализации собранных метрик, что позволяет эффективно анализировать состояние системы и выявлять тренды.
+`Loki` : научились собирать системные логи и логи Docker.
 
-Система оповещений : Реализовали настройку `Alertmanager` для автоматического реагирования на критические ситуации. Настроили правила алертов, которые позволяют своевременно получать уведомления о проблемах на почту.
+`Grafana` : Научились создавать дашборды для визуализации собранных метрик, что позволяет эффективно анализировать состояние системы и выявлять тренды. Создали аларм на почту, используя системные логи.
+
 В результате работы мы создали полноценную инфраструктуру мониторинга, способную обеспечивать прозрачность производительности системы, оперативное обнаружение проблем и автоматическое информирование ответственных лиц о чрезвычайных ситуациях.

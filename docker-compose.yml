@@ -1,13 +1,7 @@
 networks:
-  jupyterhub-network:
-    driver: bridge
-    name: jupyterhub-network  # Создание сети для JupyterHub
   monitoring:
     driver: bridge
     name: monitoring  # Создание сети для мониторинга
-  loki:
-    driver: bridge
-    name: loki  # Создание сети для Loki (системы логирования)
 
 volumes:
   prometheus_data: {}  # Том для хранения данных Prometheus
@@ -25,7 +19,6 @@ services:
     restart: unless-stopped  # Автоматический перезапуск контейнера, если он не остановлен вручную
     container_name: jupyterhub  # Имя контейнера
     networks:
-      - jupyterhub-network  # Подключение к сети JupyterHub
       - monitoring  # Подключение к сети мониторинга
     volumes:
       # Конфигурационный файл JupyterHub
@@ -40,7 +33,7 @@ services:
       # Имя администратора JupyterHub
       JUPYTERHUB_ADMIN: admin
       # Имя сети, к которой будут подключаться контейнеры
-      DOCKER_NETWORK_NAME: jupyterhub-network  
+      DOCKER_NETWORK_NAME: monitoring  
       # Образ, который будет использоваться для создания пользовательских ноутбуков
       DOCKER_NOTEBOOK_IMAGE: pattern_notebook:v1
       # Директория для ноутбуков внутри пользовательского образа
@@ -61,7 +54,6 @@ services:
       - pg-data:/var/lib/postgresql/data  # Том для хранения данных PostgreSQL
     restart: unless-stopped  # Автоматический перезапуск контейнера
     networks:
-      - jupyterhub-network  # Подключение к сети JupyterHub
       - monitoring  # Подключение к сети мониторинга
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]  # Проверка здоровья PostgreSQL
@@ -151,37 +143,6 @@ services:
     networks:
       - monitoring  # Подключение к сети мониторинга
 
-  netdata:
-    image: netdata/netdata  # Использование образа Netdata
-    container_name: netdata  # Имя контейнера
-    ports:
-      - "19999:19999"  # Порт веб-интерфейса Netdata
-    restart: unless-stopped  # Автоматический перезапуск контейнера
-    cap_add:
-      - SYS_PTRACE  # Добавление возможностей для мониторинга
-      - SYS_ADMIN
-    security_opt:
-      - apparmor:unconfined  # Отключение AppArmor
-    environment:
-      - NETDATA_CLAIM_URL=https://app.netdata.cloud  # URL для подключения к облаку Netdata
-      - DISABLE_TELEMETRY=1  # Отключение телеметрии
-      - NETDATA_BIND=0.0.0.0:19999  # Привязка к порту
-      - DISABLE_WEB_ACCESS_LOGS=1  # Отключение логов доступа
-      - NETDATA_DISABLE_CLOUD=1  # Отключение облака
-    volumes:
-      - /:/host/root:ro,rslave  # Подключение корневой файловой системы
-      - /etc/passwd:/host/etc/passwd:ro  # Подключение файла /etc/passwd
-      - /etc/group:/host/etc/group:ro  # Подключение файла /etc/group
-      - /etc/localtime:/etc/localtime:ro  # Подключение временной зоны
-      - /proc:/host/proc:ro  # Подключение директории /proc
-      - /sys:/host/sys:ro  # Подключение директории /sys
-      - /etc/os-release:/host/etc/os-release:ro  # Подключение информации о системе
-      - /var/log:/host/var/log:ro  # Подключение логов
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Подключение сокета Docker
-      - /run/dbus:/run/dbus:ro  # Подключение D-Bus
-    networks:
-      - monitoring  # Подключение к сети мониторинга
-
   loki:
     image: grafana/loki:3.4.2  # Использование образа Loki
     container_name: loki  # Имя контейнера
@@ -190,12 +151,12 @@ services:
 #    volumes:
       # touch /mnt/common_volume/swarm/grafana/config/loki.yaml;
       # mkdir -p /mnt/common_volume/grafana/loki-data;
-#      - ./loki.yaml:/etc/loki/local-config.yaml:ro
-#      - ./config:/loki
+#      - ./configs/loki.yaml:/etc/loki/local-config.yaml:ro
+#      - /config:/loki
     command: -config.file=/etc/loki/local-config.yaml  # Указание конфигурационного файла
     networks:
-      - loki  # Подключение к сети Loki
-
+      - monitoring  
+      
   promtail:
     image: grafana/promtail:latest  # Использование образа Promtail
     container_name: promtail  # Имя контейнера
@@ -208,7 +169,7 @@ services:
       - "--config.file=/etc/promtail/promtail.yaml"
       - "--config.expand-env=true"
     networks:
-      - loki  # Подключение к сети Loki
+      - monitoring
 
   grafana:
     image: grafana/grafana:11.5.1  # Использование образа Grafana
@@ -225,5 +186,4 @@ services:
     ports:
       - "3000:3000"  # Порт для доступа к Grafana
     networks:
-      - loki  # Подключение к сети Loki
       - monitoring  # Подключение к сети мониторинга
