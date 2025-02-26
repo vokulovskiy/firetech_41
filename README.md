@@ -106,8 +106,8 @@ cd ..
   `В данной конфигурации JupyterHub разворачивается па 8000 порту.`
 2. Есть ли у пользователей пароли или их кто-то задает?   
   `Пользователь сам задает пароль при регистрации на первом входе в JupyterHub http://your-domain:8000/hub/signup`   
-  ![](screens/Jupyter_sign_up.JPG)
-  `В дальнейшем администратор может поменять пароль на странице http://your-domain:8000/hub/authorize`
+  ![](screens/Jupyter_sign_up.JPG)   
+  `В дальнейшем администратор может поменять пароль на странице http://your-domain:8000/hub/authorize`   
   ![](screens/Jupyter_admin_autorize.JPG)
 3. В случае добавления пользователя - как это сделать?
   `Администратор добавляет пользователей на странице http://your-domain:8000/hub/admin#/`
